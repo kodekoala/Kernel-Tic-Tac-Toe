@@ -2,7 +2,6 @@
 
 char unknownCmd[] = {'U', 'N', 'K', 'C', 'M', 'D', '\n'};
 char invalidFmt[] = {'I', 'N', 'V', 'F', 'M', 'T', '\n'};
-
 char board[] = {'*', '*', '*', '*', '*', '*', '*', '*', '*', '\n'};
 char win[] = {'W', 'I', 'N', '\n'};
 char tie[] = {'T', 'I', 'E', '\n'};
@@ -20,8 +19,9 @@ char* cpu = NULL;
 int gameOver = 1;
 int boardFilled = 0;
 int buffer_size = 0;
-//Use standard error codes
-//Example of input to check for in write: "02 1 2\n"
+
+/* Declare mutex */
+DEFINE_MUTEX(lock);
 
 int tictactoe_open(struct inode *pinode, struct file *pfile){
     LOG_INFO("In function %s\n", __FUNCTION__);
@@ -30,33 +30,28 @@ int tictactoe_open(struct inode *pinode, struct file *pfile){
     return 0;
 }
 
-
-// read():
-//     int rv = 0;
-//     if(buffer_size) { 
-//         copy_buffer_to_user(); 
-//         rv = buffer_size; 
-//         buffer_size = 0; 
-//     }
-//     return rv;
-
 ssize_t tictactoe_read(struct file *pfile, char __user *buffer, size_t length,
                     loff_t *offset){
     int rv = 0;
+    /* Lock */
+    mutex_lock(&lock);
+    
     LOG_INFO("In function %s\n", __FUNCTION__);
     LOG_INFO("In function %s the length is %zd\n", __FUNCTION__, length);
     
     if (buffer_size){
         if (copy_to_user(&buffer[0], &returnStr[0], buffer_size) != 0){
             LOG_INFO("Copy/Allocation Error\n");
+            mutex_unlock(&lock);
             return -EFAULT;
         }
         rv = buffer_size;
         length = buffer_size;
-        buffer_size = 0;
     }
+    buffer_size = 0;
 
-    LOG_INFO("The string being copied is: [%s] and its length is [%zd]\n", returnStr, length);
+    /* Unlock */
+    mutex_unlock(&lock);
 
     //We return how many bytes someone reads from our file when they call read on it
     return rv;
@@ -64,10 +59,9 @@ ssize_t tictactoe_read(struct file *pfile, char __user *buffer, size_t length,
 
 ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t length,
                     loff_t *offset){
-    
+        
     char * kernelBuff;
     long colVal, rowVal;
-    //char * pos;
     char * st;
     char *endptr;
     char ** tokenArr;
@@ -77,6 +71,10 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
     int c = 0;
     long temp = 0;
     int MAXLEN = 9;
+    
+    /* Lock */
+    mutex_lock(&lock);
+    
     LOG_INFO("In function %s\n", __FUNCTION__);
     LOG_INFO("In function %s the length is %zd\n", __FUNCTION__, length);
 
@@ -86,11 +84,13 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
 
     if (buffer == NULL || length < 0){ //check passed in pointer
         LOG_ERROR("Invalid buffer or length passed\n");
+        mutex_unlock(&lock);
         return -EFAULT;
     }
 
     if (!access_ok(buffer, length)){ 
         LOG_ERROR("Buffer inaccessible or not as large as specified\n");
+        mutex_unlock(&lock);
         return -EFAULT;
     }
 
@@ -112,6 +112,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         if(copy_from_user( &kernelBuff[0], &buffer[0], sizeof(kernelBuff)) != 0){
             LOG_INFO("Copy/Allocation Error\n");
             kfree(kernelBuff);
+            mutex_unlock(&lock);
             return -EFAULT;
         }
 
@@ -126,6 +127,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         }
         calcSize();
         kfree(kernelBuff);
+        mutex_unlock(&lock);
         return length;
     }
 
@@ -133,12 +135,14 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
 
     if(!kernelBuff){
         LOG_INFO("Allocation Error\n");
+        mutex_unlock(&lock);
         return -EFAULT;
     }
 
     if(copy_from_user( &kernelBuff[0], &buffer[0], length) != 0){
         LOG_INFO("Copy/Allocation Error\n");
         kfree(kernelBuff);
+        mutex_unlock(&lock);
         return -EFAULT;
     }
 
@@ -147,6 +151,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         returnStr = unknownCmd;
         calcSize();
         kfree(kernelBuff);
+        mutex_unlock(&lock);
         return length;
     }
 
@@ -155,6 +160,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         returnStr = unknownCmd;
         calcSize();
         kfree(kernelBuff);
+        mutex_unlock(&lock);
         return length;
     }
 
@@ -164,6 +170,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
     if (tokenArr == NULL){
         LOG_INFO("Allocation Error\n");
         kfree(kernelBuff);
+        mutex_unlock(&lock);
         return -ENOMEM;
     }
 
@@ -194,6 +201,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
             }
             kfree(tokenArr);
             kfree(kernelBuff);
+            mutex_unlock(&lock);
             return -ENOMEM;
         }
         memcpy(tokenArr[i], dest, strlen(dest) + 1);
@@ -217,10 +225,15 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
             /*The command is 01*/
             goto case1;
         }
-        if (strcmp(tokenArr[0], "03") == 0){
+        else if (strcmp(tokenArr[0], "03") == 0){
             /*The command is 03*/
             goto case3;
         }
+        else if (strcmp(tokenArr[0], "00") == 0 || strcmp(tokenArr[0], "02") == 0)
+        {
+            illegal = 0;
+        }
+        
     }
     else if (numTokens == 2){
         if (strcmp(tokenArr[0], "00") == 0){
@@ -238,22 +251,26 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
                 goto case0;
             }
         }
+        else if (strcmp(tokenArr[0], "01") == 0 || strcmp(tokenArr[0], "02") == 0 || strcmp(tokenArr[0], "03") == 0){
+            illegal = 0;
+        }
     }
     else if (numTokens == 3){
         if (strcmp(tokenArr[0], "02") == 0){
             goto case2;
         }
+        else if (strcmp(tokenArr[0], "00") == 0 || strcmp(tokenArr[0], "01") == 0 || strcmp(tokenArr[0], "03") == 0){
+            illegal = 0;
+        }
     }
     
     /* TODO: Must return error code here!!! */
-    clearMem(kernelBuff, tokenArr);
     LOG_INFO("Setting returnStr!!!\n");
     returnStr = invalidFmt;
     if (illegal){
         returnStr = unknownCmd; 
     }
-    calcSize();
-    return length;
+    goto clearMem;
 
     LOG_INFO("The result of strcmp for 00 is %d\n", strcmp(tokenArr[0], "00"));
     LOG_INFO("The result of strcmp for 01 is %d\n", strcmp(tokenArr[0], "01"));
@@ -264,9 +281,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         for (i = 0; i < 9; i++){
             board[i] = '*';
         }
-        LOG_INFO("Its being set to ok!");
         returnStr = ok;
-        calcSize();
         LOG_INFO("The returnStr is now: %s", returnStr);
         gameOver = 0;
         boardFilled = 0;
@@ -275,22 +290,17 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
 
     case1:
         returnStr = board;
-        calcSize();
         goto clearMem;
 
     case2:
         if (gameOver){
-            clearMem(kernelBuff, tokenArr);
             returnStr = noGame;
-            calcSize();
-            return length;
+            goto clearMem;
         }
 
         if (*player != xo[turn]){
-            clearMem(kernelBuff, tokenArr);
             returnStr = oot;
-            calcSize();
-            return length;
+            goto clearMem;
         }
 
         for (i = 1; i < 3; i++){
@@ -299,10 +309,8 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
                 if (!isdigit(tokenArr[i][c]))
                 {
                     LOG_INFO("Entered coordinate is not a number\n");
-                    clearMem(kernelBuff, tokenArr);
                     returnStr = invalidFmt;
-                    calcSize();
-                    return length;
+                    goto clearMem;
                 }
             }
         }
@@ -310,29 +318,18 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         i=0;
         c=0;
 
-        // if (strlen(tokenArr[1]) != 1 || strlen(tokenArr[2]) != 1 || 
-        //     (!(tokenArr[1][0] > 47) && !(tokenArr[1][0] < 51)) && (!(tokenArr[2][0] > 47) && !(tokenArr[2][0] < 51))){
-        //     clearMem(kernelBuff, tokenArr);
-        //     returnStr = illMove;
-        //     return length;
-        // }
-
         colVal = simple_strtol(tokenArr[1], &endptr, 10);
         rowVal = simple_strtol(tokenArr[2], &endptr, 10);
 
         if (colVal < 0 || colVal > 2 || rowVal < 0 || rowVal > 2){
             LOG_INFO("Entered coordinate is invalid\n");
-            clearMem(kernelBuff, tokenArr);
             returnStr = illMove;
-            calcSize();
-            return length;
+            goto clearMem;
         }
         
         if (board[colVal + 3*rowVal] != '*'){
-            clearMem(kernelBuff, tokenArr);
             returnStr = illMove;
-            calcSize();
-            return length;
+            goto clearMem;
         }
 
         board[colVal + 3*rowVal] = *player;
@@ -340,46 +337,36 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         boardFilled++;
 
         if (rowCrossed() || columnCrossed() || diagonalCrossed()){
-            clearMem(kernelBuff, tokenArr);
             returnStr = win;
-            calcSize();
             gameOver = 1;
             turn = 0;
             boardFilled = 0;
-            return length;
+            goto clearMem;
         }
 
         if (boardFilled == 9){
-            clearMem(kernelBuff, tokenArr);
             returnStr = tie;
-            calcSize();
             gameOver = 1;
             turn = 0;
             boardFilled = 0;
-            return length;
+            goto clearMem;
         }
 
         /*Otherwise if it is not a win or tie*/
         turn = !turn;
-        clearMem(kernelBuff, tokenArr);
         returnStr = ok;
-        calcSize();
-        return length;
+        goto clearMem;
 
 
     case3:
         if (gameOver){
-            clearMem(kernelBuff, tokenArr);
             returnStr = noGame;
-            calcSize();
-            return length;
+            goto clearMem;
         }
 
         if (*player == xo[turn]){
-            clearMem(kernelBuff, tokenArr);
             returnStr = oot;
-            calcSize();
-            return length;
+            goto clearMem;
         }
 
         for (i = 0; i < 9; i++){
@@ -402,6 +389,11 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         }
         kfree(tokenArr);
         kfree(kernelBuff);
+
+        calcSize();
+
+        /* Unlock */
+        mutex_unlock(&lock);
 
         //Tell whoever called write function, we tell them how many bytes we wrote in our file
         return length;
@@ -439,4 +431,28 @@ int columnCrossed()
     } 
     return 0; 
 } 
+
+// A function that returns true if any of the diagonal 
+// is crossed with the same player's move 
+int diagonalCrossed() 
+{ 
+    if ((board[0] == board[4] && 
+        board[4] == board[8]) && board[0] != '*'){ 
+            return 1;
+        }
+          
+    if ((board[2] == board[4] && 
+        board[4] == board[6]) && board[2] != '*'){ 
+            return 1;
+        }
   
+    return 0; 
+} 
+
+void calcSize(){
+    buffer_size = 0;
+    while (returnStr[buffer_size] != '\n'){
+        buffer_size++;
+    }
+    buffer_size++;
+}

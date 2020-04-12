@@ -7,6 +7,7 @@
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
+#include <linux/mutex.h>
 
 #define MODULE_NAME "tictactoe"
 
@@ -31,7 +32,6 @@ int tictactoe_release(struct inode *pinode, struct file *pfile);
 int rowCrossed(void);
 int columnCrossed(void);
 int diagonalCrossed(void);
-void clearMem(char * kernelBuff, char** tokenArr);
 void calcSize(void);
 
 #endif
