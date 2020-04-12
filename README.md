@@ -1,6 +1,6 @@
 # project2-part1-kodekoala
 
-###This is a kernel character module implementation of the common tic-tac-toe game (3 by 3 board).
+### This is a kernel character module implementation of the common tic-tac-toe game (3 by 3 board).
 
 The user program is to write to the device file /dev/tictactoe, following the instructions and specs for project 2 part 1:
 
