@@ -8,8 +8,12 @@ The user program is to write to the device file /dev/tictactoe, following the in
 "02 X Y\n" specifies a move for the player, where X is column and Y is row. 
 "03\n" asks the computer to make a move and place its mark on the board.
 
-There are several test programs written, under the test directory. I will be adding a makefile to the test directory sometime soon. 
+There is a test program written, under the test directory - its an interactive shell like program that you can enter commands in to interact with the module. I have also added a makefile to the test directory. 
 
-There is also a driver directory that will hopefully include driver programs, along with a Makefile.
+There is also a driver directory that will potentially include driver programs, along with a Makefile.
 
-The module source code lies under the module directory. There is a Makefile that can be run to build the code.
+The module source code lies under the module directory. There is a Makefile that can be run to build the code:
+
+/part2-part1-kodekoala# make
+
+/part2-part1-kodekoala# insmod tictactoe.ko
