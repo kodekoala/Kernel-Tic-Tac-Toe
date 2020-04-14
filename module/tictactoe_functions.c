@@ -74,7 +74,6 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
     
     /* Lock */
     mutex_lock(&lock);
-    
     LOG_INFO("In function %s\n", __FUNCTION__);
     LOG_INFO("In function %s the length is %zd\n", __FUNCTION__, length);
 
@@ -115,9 +114,6 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
             mutex_unlock(&lock);
             return -EFAULT;
         }
-
-        LOG_INFO("KernelBuff[0] %c\n", kernelBuff[0]);
-        LOG_INFO("KernelBuff[1] %c\n", kernelBuff[1]);
 
         returnStr = unknownCmd;
         if (kernelBuff[0] == '0'){
@@ -165,7 +161,6 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
     }
 
     tokenArr = kmalloc(10 * sizeof(char*), GFP_KERNEL);
-    //items_ptr = (char *) malloc (3 * sizeof(char *));
 
     if (tokenArr == NULL){
         LOG_INFO("Allocation Error\n");
@@ -178,15 +173,8 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         tokenArr[i] = NULL;    
     }
 
-    LOG_INFO("HELLO\n");
-
-    // if ((pos=strchr(kernelBuff, '\n')) != NULL)
-    //     *pos = '\0';
     kernelBuff[strcspn(kernelBuff, "\n")] = '\0';
-    //kernelBuff[strcspn(line, "\n")] = '\0';  /* Zap trailing newline */
     st = kernelBuff;
-
-    LOG_INFO("****st is: [%s]", st);
 
     i = -1;
     while((dest = strsep(&st, " ")) != NULL){
@@ -205,12 +193,7 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
             return -ENOMEM;
         }
         memcpy(tokenArr[i], dest, strlen(dest) + 1);
-        LOG_INFO(" arg : [%s]\n", tokenArr[i]);
-        LOG_INFO(" len : [%zu]\n", strlen(tokenArr[i]));
     }
-        
-    LOG_INFO("=================================\n");
-
     /*Options for valid commands:
     00 X/O
     01
@@ -247,7 +230,6 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
                     player = &xo[0];
                     cpu = &xo[1];
                 }
-                LOG_INFO("Player is %c, CPU is %c", *player, *cpu);
                 goto case0;
             }
         }
@@ -264,25 +246,17 @@ ssize_t tictactoe_write(struct file *pfile, const char __user *buffer, size_t le
         }
     }
     
-    /* TODO: Must return error code here!!! */
-    LOG_INFO("Setting returnStr!!!\n");
     returnStr = invalidFmt;
     if (illegal){
         returnStr = unknownCmd; 
     }
     goto clearMem;
 
-    LOG_INFO("The result of strcmp for 00 is %d\n", strcmp(tokenArr[0], "00"));
-    LOG_INFO("The result of strcmp for 01 is %d\n", strcmp(tokenArr[0], "01"));
-    LOG_INFO("The result of strcmp for 02 is %d\n", strcmp(tokenArr[0], "02"));
-    LOG_INFO("The result of strcmp for 03 is %d\n", strcmp(tokenArr[0], "03"));
-
     case0:
         for (i = 0; i < 9; i++){
             board[i] = '*';
         }
         returnStr = ok;
-        LOG_INFO("The returnStr is now: %s", returnStr);
         gameOver = 0;
         boardFilled = 0;
         turn = 0;

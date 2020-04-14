@@ -1,0 +1,1 @@
+Run make to compile the the c test program. This is a shell like program that you can enter commands to for the tictactoe game. When entering commands don't enter a newline character, that is done for you.
