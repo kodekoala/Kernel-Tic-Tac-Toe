@@ -14,6 +14,6 @@ There is also a driver directory that will potentially include driver programs, 
 
 The module source code lies under the module directory. There is a Makefile that can be run to build the code:
 
-/part2-part1-kodekoala# make
+/part2-part1-kodekoala/module# make
 
-/part2-part1-kodekoala# insmod tictactoe.ko
+/part2-part1-kodekoala/module# insmod tictactoe.ko
